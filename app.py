@@ -55,7 +55,7 @@ def save_to_google_sheets(is_final=False, feedback_report="", scores_json="{}"):
         col_logins = sheet.col_values(1)
         if login_str in col_logins:
             row_idx = col_logins.index(login_str) + 1
-            sheet.update(f'A{row_idx}:I{row_idx}', [data_row])
+            sheet.update(values=[data_row], range_name=f'A{row_idx}:I{row_idx}') # ✅ 強制指定參數名稱
         else:
             sheet.append_row(data_row)
             
@@ -290,3 +290,4 @@ else:
                 del st.session_state[key]
 
         st.rerun()
+
