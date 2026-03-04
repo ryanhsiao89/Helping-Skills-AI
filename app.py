@@ -144,7 +144,7 @@ def save_to_google_sheets(is_final=False, feedback_report="", scores_json="{}"):
         
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         client = gspread.authorize(creds)
-        spreadsheet = client.open("2026助人技巧DBR研究數據")
+        spreadsheet = client.open("2026助人技巧DBR研究數據試算表")
         sheet = spreadsheet.worksheet("Simulator_Logs")
         
         tw_fix = timedelta(hours=8)
@@ -307,3 +307,4 @@ else:
         for key in list(st.session_state.keys()):
             if key not in ["api_key"]: del st.session_state[key]
         st.rerun()
+
