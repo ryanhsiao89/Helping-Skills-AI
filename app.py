@@ -30,7 +30,7 @@ def save_to_google_sheets(is_final=False, feedback_report="", scores_json="{}"):
         
         # 2. 使用 gspread 來「尋找」試算表 (這個動作很安全)
         client = gspread.authorize(creds)
-        spreadsheet = client.open("2026助人技巧DBR研究數據")
+        spreadsheet = client.open("2026助人技巧DBR研究數據試算表")
         sheet = spreadsheet.worksheet("Simulator_Logs")
         
         # --- 準備要寫入的資料 ---
@@ -314,4 +314,5 @@ else:
             if key not in ["api_key"]:
                 del st.session_state[key]
         st.rerun()
+
 
