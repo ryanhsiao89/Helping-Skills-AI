@@ -2,3 +2,4 @@ streamlit
 google-generativeai
 gspread==5.12.0
 google-auth
+google-api-python-client
