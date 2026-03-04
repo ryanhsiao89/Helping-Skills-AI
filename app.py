@@ -61,7 +61,7 @@ def save_to_google_sheets(is_final=False, feedback_report="", scores_json="{}"):
             
         return True
     except Exception as e:
-        print(f"寫入 Google Sheets 失敗: {e}")
+        st.error(f"寫入 Google Sheets 失敗: {e}")
         return False
 
 # --- 第一層：個案靈魂 Prompt ---
@@ -288,4 +288,5 @@ else:
         for key in list(st.session_state.keys()):
             if key not in ["api_key"]: # 保留 API Key
                 del st.session_state[key]
+
         st.rerun()
