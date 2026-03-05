@@ -239,7 +239,7 @@ if not st.session_state.otp_verified:
                 st.error("❌ 查無此學號/ID，請確認您是否具備本研究之參與資格。")
             else:
                 target_email = WHITELIST[student_id_clean]
-                # 簡單隱藏 Email 中間字元以保護隱私 (例如 bb11****@hcu.edu.tw)
+                # 簡單隱藏 Email 中間字元以保護隱私
                 masked_email = target_email[:4] + "****" + target_email[target_email.find("@"):]
                 
                 with st.spinner("正在發送驗證信，請稍候..."):
@@ -250,7 +250,7 @@ if not st.session_state.otp_verified:
                         st.session_state.selected_case_key = selected_case
                         st.success(f"✅ 驗證碼已發送至您的專屬信箱 ({masked_email})！請檢查收件匣（若無請檢查垃圾郵件）。")
                     else:
-                        st.error("❌ 寄信失敗，請向研究者確認系統後台信箱設定 (需設置 Google 應用程式密碼)。")
+                        st.error("❌ 寄信失敗，請向研究者確認系統後台信箱設定。")
     
     # 步驟二：輸入驗證碼
     if st.session_state.generated_otp:
@@ -261,9 +261,9 @@ if not st.session_state.otp_verified:
                 st.session_state.otp_verified = True
                 st.session_state.start_time = datetime.now()
                 
-                # 🌟 已經將模型改為穩定高乘載的 gemini-pro
+                # 🌟 正式改用最穩定的 gemini-1.0-pro
                 genai.configure(api_key=st.session_state.api_key)
-                model = genai.GenerativeModel(model_name="gemini-pro", generation_config=GenerationConfig(temperature=0.0))
+                model = genai.GenerativeModel(model_name="gemini-1.0-pro", generation_config=GenerationConfig(temperature=0.0))
                 client_prompt = CASES[st.session_state.selected_case_key]["prompt"]
                 st.session_state.chat_session = model.start_chat(history=[
                     {"role": "user", "parts": [client_prompt]},
@@ -324,8 +324,8 @@ else:
                 
                 final_prompt = f"{SUPERVISOR_PROMPT}\n\n[待評估的對話紀錄如下]\n{log_text}"
                 
-                # 🌟 已經將督導模型也改為穩定高乘載的 gemini-pro
-                supervisor_model = genai.GenerativeModel(model_name="gemini-pro", generation_config=GenerationConfig(temperature=0.0))
+                # 🌟 督導評分也改用最穩定的 gemini-1.0-pro
+                supervisor_model = genai.GenerativeModel(model_name="gemini-1.0-pro", generation_config=GenerationConfig(temperature=0.0))
                 feedback_resp = supervisor_model.generate_content(final_prompt)
                 report = feedback_resp.text
                 st.session_state.supervisor_feedback = report
@@ -351,6 +351,3 @@ else:
         for key in list(st.session_state.keys()):
             if key not in ["api_key"]: del st.session_state[key]
         st.rerun()
-
-
-
