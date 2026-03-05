@@ -261,9 +261,9 @@ if not st.session_state.otp_verified:
                 st.session_state.otp_verified = True
                 st.session_state.start_time = datetime.now()
                 
-                # 🌟 已經將模型改為穩定高乘載的 gemini-2.0-flash
+                # 🌟 已經將模型改為穩定高乘載的 gemini-pro
                 genai.configure(api_key=st.session_state.api_key)
-                model = genai.GenerativeModel(model_name="gemini-2.0-flash", generation_config=GenerationConfig(temperature=0.0))
+                model = genai.GenerativeModel(model_name="gemini-pro", generation_config=GenerationConfig(temperature=0.0))
                 client_prompt = CASES[st.session_state.selected_case_key]["prompt"]
                 st.session_state.chat_session = model.start_chat(history=[
                     {"role": "user", "parts": [client_prompt]},
@@ -324,8 +324,8 @@ else:
                 
                 final_prompt = f"{SUPERVISOR_PROMPT}\n\n[待評估的對話紀錄如下]\n{log_text}"
                 
-                # 🌟 已經將督導模型也改為穩定高乘載的 gemini-2.0-flash
-                supervisor_model = genai.GenerativeModel(model_name="gemini-2.0-flash", generation_config=GenerationConfig(temperature=0.0))
+                # 🌟 已經將督導模型也改為穩定高乘載的 gemini-pro
+                supervisor_model = genai.GenerativeModel(model_name="gemini-pro", generation_config=GenerationConfig(temperature=0.0))
                 feedback_resp = supervisor_model.generate_content(final_prompt)
                 report = feedback_resp.text
                 st.session_state.supervisor_feedback = report
@@ -351,5 +351,6 @@ else:
         for key in list(st.session_state.keys()):
             if key not in ["api_key"]: del st.session_state[key]
         st.rerun()
+
 
 
