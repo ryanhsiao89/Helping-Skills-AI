@@ -85,7 +85,7 @@ CASES = {
         "prompt": """Role: 你是一位名叫「陳心怡」的大學二年級學生，目前正在諮商中心初次晤談。你是一位真實人類，絕對不要提及自己是 AI。
 [核心背景與觸發事件]
 - 表面問題：上個月被交往兩年的初戀男友提分手，對方只說「感覺淡了」，你覺得世界崩塌。
-- 情緒狀態：悲傷、自我懷疑、覺得自己沒有價值。
+- 情緒狀態：悲悲傷、自我懷疑、覺得自己沒有價值。
 - 行為困擾：理智上知道該放下，但還是會忍不住偷看他的社群動態，看完又自己崩潰大哭。
 [隱藏的 PERMA-V 優勢資源]
 - 你擁有很強的「復原力（Resilience）」：儘管每天哭，你還是強迫自己去咖啡廳打工，沒有曠職過。
@@ -234,12 +234,10 @@ if not st.session_state.otp_verified:
         else:
             student_id_clean = student_id_input.strip()
             
-            # 白名單身分核對
             if student_id_clean not in WHITELIST:
                 st.error("❌ 查無此學號/ID，請確認您是否具備本研究之參與資格。")
             else:
                 target_email = WHITELIST[student_id_clean]
-                # 簡單隱藏 Email 中間字元以保護隱私
                 masked_email = target_email[:4] + "****" + target_email[target_email.find("@"):]
                 
                 with st.spinner("正在發送驗證信，請稍候..."):
@@ -252,7 +250,6 @@ if not st.session_state.otp_verified:
                     else:
                         st.error("❌ 寄信失敗，請向研究者確認系統後台信箱設定。")
     
-    # 步驟二：輸入驗證碼
     if st.session_state.generated_otp:
         st.markdown("### 🔐 步驟二：輸入驗證碼")
         user_otp = st.text_input("請輸入您信箱收到的 6 位數驗證碼：", type="password")
@@ -261,9 +258,9 @@ if not st.session_state.otp_verified:
                 st.session_state.otp_verified = True
                 st.session_state.start_time = datetime.now()
                 
-                # 🌟 正式改用最穩定的 gemini-1.0-pro
+                # 🌟 換回你專屬的 gemini-2.5-flash
                 genai.configure(api_key=st.session_state.api_key)
-                model = genai.GenerativeModel(model_name="gemini-1.0-pro", generation_config=GenerationConfig(temperature=0.0))
+                model = genai.GenerativeModel(model_name="gemini-2.5-flash", generation_config=GenerationConfig(temperature=0.0))
                 client_prompt = CASES[st.session_state.selected_case_key]["prompt"]
                 st.session_state.chat_session = model.start_chat(history=[
                     {"role": "user", "parts": [client_prompt]},
@@ -302,7 +299,17 @@ if not st.session_state.is_ended:
                 st.session_state.history.append({"role": "model", "parts": [response.text]})
                 save_to_google_sheets()
                 st.rerun()
-            except Exception as e: st.error(f"發生錯誤：{e}")
+            except Exception as e: 
+                # 🌟 新增對話時的自動重試機制
+                if "429" in str(e) or "Quota" in str(e):
+                    st.warning("⏳ 系統偵測到您的回覆頻率極高，正在自動為您緩衝 20 秒，請稍候...")
+                    time.sleep(20)
+                    response = st.session_state.chat_session.send_message(user_input)
+                    st.session_state.history.append({"role": "model", "parts": [response.text]})
+                    save_to_google_sheets()
+                    st.rerun()
+                else:
+                    st.error(f"發生錯誤：{e}")
                 
     st.markdown("---")
     col1, col2 = st.columns([8, 2])
@@ -324,9 +331,19 @@ else:
                 
                 final_prompt = f"{SUPERVISOR_PROMPT}\n\n[待評估的對話紀錄如下]\n{log_text}"
                 
-                # 🌟 督導評分也改用最穩定的 gemini-1.0-pro
-                supervisor_model = genai.GenerativeModel(model_name="gemini-1.0-pro", generation_config=GenerationConfig(temperature=0.0))
-                feedback_resp = supervisor_model.generate_content(final_prompt)
+                # 🌟 換回 gemini-2.5-flash 搭配自動重試機制
+                supervisor_model = genai.GenerativeModel(model_name="gemini-2.5-flash", generation_config=GenerationConfig(temperature=0.0))
+                
+                try:
+                    feedback_resp = supervisor_model.generate_content(final_prompt)
+                except Exception as inner_e:
+                    if "429" in str(inner_e) or "Quota" in str(inner_e):
+                        st.info("⏳ 正在等待 Google 釋放每分鐘運算額度，系統自動倒數 20 秒中，請勿關閉網頁...")
+                        time.sleep(20)
+                        feedback_resp = supervisor_model.generate_content(final_prompt)
+                    else:
+                        raise inner_e
+
                 report = feedback_resp.text
                 st.session_state.supervisor_feedback = report
                 
