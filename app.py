@@ -261,9 +261,9 @@ if not st.session_state.otp_verified:
                 st.session_state.otp_verified = True
                 st.session_state.start_time = datetime.now()
                 
-                # 初始化對話模型 (AI 的 temperature 將維持在 0 以確保評分與反應穩定性)
+                # 🌟 已經將模型改為穩定高乘載的 gemini-1.5-flash
                 genai.configure(api_key=st.session_state.api_key)
-                model = genai.GenerativeModel(model_name="gemini-2.5-flash", generation_config=GenerationConfig(temperature=0.0))
+                model = genai.GenerativeModel(model_name="gemini-1.5-flash", generation_config=GenerationConfig(temperature=0.0))
                 client_prompt = CASES[st.session_state.selected_case_key]["prompt"]
                 st.session_state.chat_session = model.start_chat(history=[
                     {"role": "user", "parts": [client_prompt]},
@@ -323,7 +323,9 @@ else:
                     log_text += f"{role_str}: {content}\n"
                 
                 final_prompt = f"{SUPERVISOR_PROMPT}\n\n[待評估的對話紀錄如下]\n{log_text}"
-                supervisor_model = genai.GenerativeModel(model_name="gemini-2.5-flash", generation_config=GenerationConfig(temperature=0.0))
+                
+                # 🌟 已經將督導模型也改為穩定高乘載的 gemini-1.5-flash
+                supervisor_model = genai.GenerativeModel(model_name="gemini-1.5-flash", generation_config=GenerationConfig(temperature=0.0))
                 feedback_resp = supervisor_model.generate_content(final_prompt)
                 report = feedback_resp.text
                 st.session_state.supervisor_feedback = report
