@@ -13,7 +13,7 @@ WHITELIST = {
     'BB1112067': 'bb1112067@hcu.edu.tw',
     'BB1122013': 'bb1122013@hcu.edu.tw',
     'BB1122034': 'bb1122034@hcu.edu.tw',
-    'BB1122053': 'bb1122053@hcu.edu.tw',
+    'BB1122053': 'jasminehu0711@gmail.com',
     'BB1125034': 'bb1125034@hcu.edu.tw',
     'GB1132002': 'gb1132002@hcu.edu.tw',
     'GB1142006': 'gb1142006@hcu.edu.tw',
