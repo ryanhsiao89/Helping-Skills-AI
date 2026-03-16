@@ -174,11 +174,39 @@ else:
                 save_to_google_sheets(is_final=True, feedback_report=report, scores_json=json.dumps(scores, ensure_ascii=False))
             except Exception as e: st.error(f"督導評分系統發生錯誤：{e}")
                 
-    st.success("✅ 晤談紀錄與評分已成功自動上傳至研究資料庫！")
+st.success("✅ 晤談紀錄與評分已成功自動上傳至研究資料庫！")
     st.markdown("## 📋 督導回饋報告")
     st.markdown(st.session_state.supervisor_feedback)
     
-    if st.button("🔄 返回首頁 / 選擇其他個案"):
-        for key in list(st.session_state.keys()):
-            if key not in ["api_key"]: del st.session_state[key]
-        st.rerun()
+    # --- 🌟 新增：整理並建立下載文字檔 ---
+    export_text = f"【助人技巧 AI 模擬演練紀錄】\n"
+    export_text += f"演練時間：{st.session_state.start_time.strftime('%Y-%m-%d %H:%M')}\n"
+    export_text += f"演練學號：{st.session_state.student_id}\n"
+    export_text += f"個案情境：{st.session_state.selected_case_key}\n"
+    export_text += "="*40 + "\n\n"
+    
+    export_text += "【對話逐字稿】\n"
+    for msg in st.session_state.history:
+        role_str = "助人者" if msg["role"] == "user" else "個案"
+        content = msg["parts"][0] if "parts" in msg else msg["content"]
+        export_text += f"{role_str}：{content}\n\n"
+        
+    export_text += "="*40 + "\n\n"
+    export_text += "【督導回饋報告】\n"
+    export_text += st.session_state.supervisor_feedback
+    
+    # 下載按鈕 (左右排列讓畫面好看)
+    col3, col4 = st.columns([1, 1])
+    with col3:
+        st.download_button(
+            label="📥 下載本次對話紀錄與督導評分 (txt檔)",
+            data=export_text,
+            file_name=f"晤談紀錄_{st.session_state.student_id}_{datetime.now().strftime('%Y%m%d%H%M')}.txt",
+            mime="text/plain",
+            use_container_width=True
+        )
+    with col4:
+        if st.button("🔄 返回首頁 / 選擇其他個案", use_container_width=True):
+            for key in list(st.session_state.keys()):
+                if key not in ["api_key"]: del st.session_state[key]
+            st.rerun()
