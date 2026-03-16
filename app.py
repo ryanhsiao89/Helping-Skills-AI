@@ -135,6 +135,7 @@ if not st.session_state.is_ended:
             st.rerun()
 
 else:
+    # 這裡開始是晤談結束後的區塊，必須統一縮排 4 格
     if not st.session_state.supervisor_feedback:
         st.markdown("---")
         with st.spinner("👨‍🏫 臨床督導正在審閱你的對話紀錄，進行 5+1 技巧評分... (約需 10-20 秒)"):
@@ -172,13 +173,14 @@ else:
                     scores[key] = int(match.group(1)) if match else 0
                 
                 save_to_google_sheets(is_final=True, feedback_report=report, scores_json=json.dumps(scores, ensure_ascii=False))
-            except Exception as e: st.error(f"督導評分系統發生錯誤：{e}")
+            except Exception as e: 
+                st.error(f"督導評分系統發生錯誤：{e}")
                 
-st.success("✅ 晤談紀錄與評分已成功自動上傳至研究資料庫！")
+    st.success("✅ 晤談紀錄與評分已成功自動上傳至研究資料庫！")
     st.markdown("## 📋 督導回饋報告")
     st.markdown(st.session_state.supervisor_feedback)
     
-    # --- 🌟 新增：整理並建立下載文字檔 ---
+    # --- 🌟 整理並建立下載文字檔 ---
     export_text = f"【助人技巧 AI 模擬演練紀錄】\n"
     export_text += f"演練時間：{st.session_state.start_time.strftime('%Y-%m-%d %H:%M')}\n"
     export_text += f"演練學號：{st.session_state.student_id}\n"
@@ -195,7 +197,7 @@ st.success("✅ 晤談紀錄與評分已成功自動上傳至研究資料庫！"
     export_text += "【督導回饋報告】\n"
     export_text += st.session_state.supervisor_feedback
     
-    # 下載按鈕 (左右排列讓畫面好看)
+    # 顯示下載按鈕與返回按鈕
     col3, col4 = st.columns([1, 1])
     with col3:
         st.download_button(
