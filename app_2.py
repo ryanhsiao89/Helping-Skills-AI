@@ -6,7 +6,7 @@ import re
 import random
 import json
 from datetime import datetime
-# 🌟 從我們剛建立的資料庫中匯入所有功能與變數
+# 🌟 從資料庫中匯入功能與變數
 from data_manager import WHITELIST, CASES, SUPERVISOR_PROMPT, send_otp_email, save_to_google_sheets
 
 # --- 系統與頁面設定 ---
@@ -23,6 +23,8 @@ if "start_time" not in st.session_state: st.session_state.start_time = None
 if "is_ended" not in st.session_state: st.session_state.is_ended = False
 if "supervisor_feedback" not in st.session_state: st.session_state.supervisor_feedback = ""
 if "selected_case_key" not in st.session_state: st.session_state.selected_case_key = ""
+# 🌟 新增：專門用來儲存下載文本的狀態
+if "export_text" not in st.session_state: st.session_state.export_text = ""
 
 # --- 側邊欄 ---
 st.sidebar.title("⚙️ 系統設定")
@@ -95,6 +97,7 @@ st.title(f"🗣️ 模擬晤談中 (個案：{case_name_display})")
 with st.expander("📄 個案基本資料與來談主訴 (點擊可收合/展開)", expanded=True):
     st.markdown(CASES[current_case_key]["info"])
 
+# 渲染歷史對話
 for msg in st.session_state.history:
     role = "assistant" if msg["role"] == "model" else "user"
     with st.chat_message(role):
@@ -135,7 +138,7 @@ if not st.session_state.is_ended:
             st.rerun()
 
 else:
-    # 這裡開始是晤談結束後的區塊，必須統一縮排 4 格
+    # 這裡開始是晤談結束後的區塊
     if not st.session_state.supervisor_feedback:
         st.markdown("---")
         with st.spinner("👨‍🏫 臨床督導正在審閱你的對話紀錄，進行 5+1 技巧評分... (約需 10-20 秒)"):
@@ -173,42 +176,45 @@ else:
                     scores[key] = int(match.group(1)) if match else 0
                 
                 save_to_google_sheets(is_final=True, feedback_report=report, scores_json=json.dumps(scores, ensure_ascii=False))
+                
+                # 🌟 修復關鍵：在取得評分的當下，就組合好字串並存入 session_state
+                export_text = f"【助人技巧 AI 模擬演練紀錄】\n"
+                export_text += f"演練時間：{st.session_state.start_time.strftime('%Y-%m-%d %H:%M')}\n"
+                export_text += f"演練學號：{st.session_state.student_id}\n"
+                export_text += f"個案情境：{st.session_state.selected_case_key}\n"
+                export_text += "="*40 + "\n\n"
+                export_text += "【對話逐字稿】\n"
+                for msg in st.session_state.history:
+                    role_str = "助人者" if msg["role"] == "user" else "個案"
+                    content = msg["parts"][0] if "parts" in msg else msg["content"]
+                    export_text += f"{role_str}：{content}\n\n"
+                export_text += "="*40 + "\n\n"
+                export_text += "【督導回饋報告】\n"
+                export_text += report
+                
+                st.session_state.export_text = export_text
+                st.rerun() # 重新渲染頁面以顯示結果
+
             except Exception as e: 
                 st.error(f"督導評分系統發生錯誤：{e}")
                 
-    st.success("✅ 晤談紀錄與評分已成功自動上傳至研究資料庫！")
-    st.markdown("## 📋 督導回饋報告")
-    st.markdown(st.session_state.supervisor_feedback)
-    
-    # --- 🌟 整理並建立下載文字檔 ---
-    export_text = f"【助人技巧 AI 模擬演練紀錄】\n"
-    export_text += f"演練時間：{st.session_state.start_time.strftime('%Y-%m-%d %H:%M')}\n"
-    export_text += f"演練學號：{st.session_state.student_id}\n"
-    export_text += f"個案情境：{st.session_state.selected_case_key}\n"
-    export_text += "="*40 + "\n\n"
-    
-    export_text += "【對話逐字稿】\n"
-    for msg in st.session_state.history:
-        role_str = "助人者" if msg["role"] == "user" else "個案"
-        content = msg["parts"][0] if "parts" in msg else msg["content"]
-        export_text += f"{role_str}：{content}\n\n"
+    if st.session_state.supervisor_feedback:
+        st.success("✅ 晤談紀錄與評分已成功自動上傳至研究資料庫！")
+        st.markdown("## 📋 督導回饋報告")
+        st.markdown(st.session_state.supervisor_feedback)
         
-    export_text += "="*40 + "\n\n"
-    export_text += "【督導回饋報告】\n"
-    export_text += st.session_state.supervisor_feedback
-    
-    # 顯示下載按鈕與返回按鈕
-    col3, col4 = st.columns([1, 1])
-    with col3:
-        st.download_button(
-            label="📥 下載本次對話紀錄與督導評分 (txt檔)",
-            data=export_text,
-            file_name=f"晤談紀錄_{st.session_state.student_id}_{datetime.now().strftime('%Y%m%d%H%M')}.txt",
-            mime="text/plain",
-            use_container_width=True
-        )
-    with col4:
-        if st.button("🔄 返回首頁 / 選擇其他個案", use_container_width=True):
-            for key in list(st.session_state.keys()):
-                if key not in ["api_key"]: del st.session_state[key]
-            st.rerun()
+        # 顯示下載按鈕與返回按鈕 (此時直接取用 session_state 內的字串)
+        col3, col4 = st.columns([1, 1])
+        with col3:
+            st.download_button(
+                label="📥 下載本次對話紀錄與督導評分 (txt檔)",
+                data=st.session_state.export_text,
+                file_name=f"晤談紀錄_{st.session_state.student_id}_{datetime.now().strftime('%Y%m%d%H%M')}.txt",
+                mime="text/plain",
+                use_container_width=True
+            )
+        with col4:
+            if st.button("🔄 返回首頁 / 選擇其他個案", use_container_width=True):
+                for key in list(st.session_state.keys()):
+                    if key not in ["api_key"]: del st.session_state[key]
+                st.rerun()
