@@ -139,10 +139,19 @@ if not st.session_state.is_ended:
                             genai.configure(api_key=new_key)
                             st.toast(f"🔄 第 {next_index} 組額度已滿，自動切換至備用 Key 繼續運作...", icon="🛡️")
                             
-                            # 重新建構帶有歷史記憶的 Chat Session (排除剛剛失敗的最後一句)
+                            # 重新建構帶有歷史記憶的 Chat Session 
                             model = genai.GenerativeModel(model_name="gemini-2.5-flash", generation_config=GenerationConfig(temperature=0.0))
+                            
+                            # 🌟 [修復角色錯亂]：將「個案初始設定檔」與「扣除最後一句失敗的歷史紀錄」重新合併
+                            client_prompt = CASES[st.session_state.selected_case_key]["prompt"]
+                            base_history = [
+                                {"role": "user", "parts": [client_prompt]},
+                                {"role": "model", "parts": ["我準備好了，請助人者開始。"]}
+                            ]
                             old_history = st.session_state.history[:-1] 
-                            st.session_state.chat_session = model.start_chat(history=old_history)
+                            full_history = base_history + old_history
+                            
+                            st.session_state.chat_session = model.start_chat(history=full_history)
                             # 迴圈會繼續下一次嘗試
                         else:
                             # 所有 Key 都用光了，終極防護：等 20 秒
