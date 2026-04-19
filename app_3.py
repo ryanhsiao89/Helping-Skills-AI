@@ -36,7 +36,7 @@ if api_input:
     st.session_state.api_keys = parsed_keys
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("**📝 演練提示**\n1. 這是**初次晤談**，火力集中在「探索階段」。\n2. 務必使用 **`( )`** 描述非口語行為。\n3. 目標時間：10-15分鐘。")
+st.sidebar.markdown("**📝 演練提示**\n1. 這是**初次晤談**，火力集中在「探索階段」。\n2. 務必使用 **`( )`** 描述非口語行為。\n3. 目標時間：30-45分鐘。")
 
 # --- 畫面 1：登入與雙重驗證 (OTP) ---
 if not st.session_state.otp_verified:
