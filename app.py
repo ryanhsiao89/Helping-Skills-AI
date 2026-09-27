@@ -64,7 +64,17 @@ def parse_api_keys(raw_text: str) -> list[str]:
 def get_current_api_key() -> str:
     if not st.session_state.api_keys:
         raise RuntimeError("尚未輸入任何 API Key。")
+    # 安全取模，防止 index 超出範圍
+    st.session_state.current_key_index %= len(st.session_state.api_keys)
     return st.session_state.api_keys[st.session_state.current_key_index]
+
+
+def rotate_key_round_robin():
+    """【Round-Robin 核心】每次主動請求前輪替至下一把 Key。"""
+    if len(st.session_state.api_keys) > 1:
+        st.session_state.current_key_index = (
+            st.session_state.current_key_index + 1
+        ) % len(st.session_state.api_keys)
 
 
 def get_case_system_instruction(case_key: str) -> str:
@@ -129,8 +139,7 @@ def history_to_gemini_format(exclude_last_user: bool = False) -> list[dict]:
 
 def rebuild_chat_session(exclude_last_user: bool = False):
     """
-    依目前 case + 真實歷史重建 chat session。
-    這裡不再把 client_prompt 當成 fake user history。
+    依目前指向的 API Key + case + 真實歷史重建 chat session。
     """
     api_key = get_current_api_key()
     case_key = st.session_state.selected_case_key
@@ -145,24 +154,20 @@ def ensure_chat_session():
         rebuild_chat_session(exclude_last_user=False)
 
 
-def switch_to_next_key() -> bool:
-    """切換到下一把 API Key。成功回傳 True，否則 False。"""
-    next_index = st.session_state.current_key_index + 1
-    if next_index < len(st.session_state.api_keys):
-        st.session_state.current_key_index = next_index
-        return True
-    return False
-
-
-def send_dialog_message_with_failover(user_input: str) -> str:
+def send_dialog_message_round_robin(user_input: str) -> str:
     """
-    傳送對話訊息給模擬個案。
-    遇到 429 / Quota 時自動切 key，並重建 chat session 後重試。
+    主動循環分流（Round-Robin）傳送對話。
+    每次發言主動輪替至下一組 Key；若遇 429 則自動切換其餘 Key 進行故障重試。
     """
     if not st.session_state.api_keys:
         raise RuntimeError("尚未輸入任何 API Key。")
 
-    ensure_chat_session()
+    # 1. 每次發言前先輪替到下一組 Key (Round-Robin 分流)
+    rotate_key_round_robin()
+    rebuild_chat_session(exclude_last_user=True)
+
+    max_retries = len(st.session_state.api_keys)
+    attempts = 0
     waited_once = False
 
     while True:
@@ -172,20 +177,22 @@ def send_dialog_message_with_failover(user_input: str) -> str:
 
         except Exception as e:
             err_text = str(e)
-
             if "429" in err_text or "Quota" in err_text:
-                if switch_to_next_key():
+                attempts += 1
+                if attempts < max_retries:
+                    # 遭遇限流，切換到下一組 Key 容錯
+                    rotate_key_round_robin()
                     st.toast(
-                        f"🔄 第 {st.session_state.current_key_index + 1} 組 API Key 已接手繼續運作...",
+                        f"🔄 專案額度分流：切換至第 {st.session_state.current_key_index + 1} 組 Key 重試...",
                         icon="🛡️"
                     )
-                    # 重建時排除最後一句尚未成功送出的 user 訊息
                     rebuild_chat_session(exclude_last_user=True)
                     continue
 
                 if not waited_once:
                     waited_once = True
-                    st.warning("⏳ 所有備用 API 額度皆暫時滿載，系統自動倒數 20 秒緩衝中...")
+                    attempts = 0
+                    st.warning("⏳ 所有專案 API 額度皆暫時滿載，系統自動倒數 20 秒緩衝中...")
                     time.sleep(20)
                     rebuild_chat_session(exclude_last_user=True)
                     continue
@@ -193,14 +200,16 @@ def send_dialog_message_with_failover(user_input: str) -> str:
             raise e
 
 
-def generate_supervisor_feedback_with_failover(final_prompt: str) -> str:
+def generate_supervisor_feedback_round_robin(final_prompt: str) -> str:
     """
-    產生督導評分報告。
-    遇到 429 / Quota 時自動切 key 或等待後重試。
+    產生督導評分報告（含 Round-Robin 與 Failover 重試）。
     """
     if not st.session_state.api_keys:
         raise RuntimeError("尚未輸入任何 API Key。")
 
+    rotate_key_round_robin()
+    max_retries = len(st.session_state.api_keys)
+    attempts = 0
     waited_once = False
 
     while True:
@@ -211,13 +220,15 @@ def generate_supervisor_feedback_with_failover(final_prompt: str) -> str:
 
         except Exception as e:
             err_text = str(e)
-
             if "429" in err_text or "Quota" in err_text:
-                if switch_to_next_key():
+                attempts += 1
+                if attempts < max_retries:
+                    rotate_key_round_robin()
                     continue
 
                 if not waited_once:
                     waited_once = True
+                    attempts = 0
                     st.info("⏳ 督導評分：所有 API 額度暫時滿載，系統自動倒數 20 秒...")
                     time.sleep(20)
                     continue
@@ -248,10 +259,15 @@ def extract_scores_from_report(report: str) -> dict:
 st.sidebar.title("⚙️ 系統設定")
 
 api_input = st.sidebar.text_area(
-    "🔑 輸入 Gemini API Key\n(可輸入 2-3 組，請用逗號或換行隔開以防斷線)",
+    "🔑 輸入 Gemini API Key\n(建議輸入 2-3 組不同專案的 Key，逗號或換行隔開)",
     value="\n".join(st.session_state.api_keys),
 )
 st.session_state.api_keys = parse_api_keys(api_input)
+
+if st.session_state.api_keys:
+    st.sidebar.caption(
+        f"🟢 已啟用 Round-Robin 負載分流 (共 {len(st.session_state.api_keys)} 組 Key)"
+    )
 
 st.sidebar.markdown("---")
 st.sidebar.markdown(
@@ -365,7 +381,8 @@ if not st.session_state.is_ended:
             time.sleep(1.5)
 
             try:
-                response_text = send_dialog_message_with_failover(user_input)
+                # 採用 Round-Robin 輪替發送
+                response_text = send_dialog_message_round_robin(user_input)
 
                 # 成功後才把 AI 回應放進歷史
                 st.session_state.history.append({"role": "model", "parts": [response_text]})
@@ -373,7 +390,7 @@ if not st.session_state.is_ended:
                 st.rerun()
 
             except Exception as e:
-                # 若真的失敗，移除剛剛那句尚未完成的 user 訊息，避免歷史失衡
+                # 若失敗，移除最後一句未完成的 user 訊息避免狀態紊亂
                 if st.session_state.history and st.session_state.history[-1]["role"] == "user":
                     st.session_state.history.pop()
                 st.error(f"發生未預期的錯誤：{e}")
@@ -402,7 +419,7 @@ else:
             final_prompt = f"{SUPERVISOR_PROMPT}\n\n[待評估的對話紀錄如下]\n{log_text}"
 
             try:
-                report = generate_supervisor_feedback_with_failover(final_prompt)
+                report = generate_supervisor_feedback_round_robin(final_prompt)
                 st.session_state.supervisor_feedback = report
 
                 scores = extract_scores_from_report(report)
